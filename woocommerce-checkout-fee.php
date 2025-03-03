@@ -2,99 +2,87 @@
 /**
  * Plugin Name: WooCommerce Checkout Fee
  * Plugin URI: https://github.com/gdeguglielmo/woocommerce-checkout-fee
- * Description: Aggiunge una fee al carrello di WooCommerce che può essere rimossa dall'utente tramite una checkbox.
+ * Description: Aggiungi una fee personalizzabile al carrello in WooCommerce che può essere rimossa tramite una checkbox.
  * Version: 1.0
- * Author: [Il tuo nome]
- * Author URI: [Il tuo sito web]
+ * Author: Il tuo nome
+ * Author URI: https://github.com/gdeguglielmo
  * License: GPL2
  */
 
-// Assicurati che WooCommerce sia attivo
-if ( ! defined( 'ABSPATH' ) ) {
-    exit; // Exit if accessed directly
-}
-
 // Aggiungi la fee al carrello
-function wc_add_checkout_fee() {
-    // Verifica se la checkbox è stata selezionata
-    if ( isset( $_POST['remove_checkout_fee'] ) ) {
-        // Se la checkbox è spuntata, non aggiungere la fee
-        return;
+function wccf_add_checkout_fee() {
+    // Verifica se la checkbox è selezionata
+    if ( isset( $_POST['wccf_checkout_fee'] ) && $_POST['wccf_checkout_fee'] == '1' ) {
+        $fee = 10; // La fee, modificabile da backend
+        WC()->cart->add_fee( 'Fee Personalizzata', $fee );
     }
-
-    // Aggiungi la fee al carrello
-    $fee = 10; // L'importo della fee (puoi modificarlo tramite opzioni nel backend)
-    WC()->cart->add_fee( __( 'Checkout Fee', 'woocommerce-checkout-fee' ), $fee, true, '' );
 }
-add_action( 'woocommerce_cart_calculate_fees', 'wc_add_checkout_fee' );
+add_action( 'woocommerce_cart_calculate_fees', 'wccf_add_checkout_fee' );
 
-// Aggiungi la checkbox al checkout
-function wc_checkout_fee_checkbox() {
-    // Aggiungi una checkbox al form di checkout
-    echo '<div class="checkout-fee-checkbox">';
-    echo '<label>';
-    echo '<input type="checkbox" name="remove_checkout_fee" value="1" /> ';
-    echo __( 'Remove checkout fee', 'woocommerce-checkout-fee' );
-    echo '</label>';
+// Aggiungi una checkbox nella pagina del checkout per rimuovere la fee
+function wccf_checkout_fee_checkbox() {
+    echo '<div class="wccf-checkout-fee">';
+    echo '<input type="checkbox" name="wccf_checkout_fee" value="1" checked> Aggiungi una fee di 10€';
     echo '</div>';
 }
-add_action( 'woocommerce_review_order_before_payment', 'wc_checkout_fee_checkbox' );
+add_action( 'woocommerce_review_order_before_submit', 'wccf_checkout_fee_checkbox' );
 
-// Salva la scelta dell'utente nella sessione
-function wc_save_checkout_fee_checkbox( $order_id ) {
-    if ( isset( $_POST['remove_checkout_fee'] ) ) {
-        update_post_meta( $order_id, '_remove_checkout_fee', 'yes' );
-    } else {
-        update_post_meta( $order_id, '_remove_checkout_fee', 'no' );
-    }
-}
-add_action( 'woocommerce_checkout_update_order_meta', 'wc_save_checkout_fee_checkbox' );
-
-// Aggiungi una pagina delle opzioni nel backend per impostare il testo e l'importo della fee
-function wc_checkout_fee_settings_page() {
-    add_options_page(
-        'WooCommerce Checkout Fee Settings', 
-        'Checkout Fee Settings', 
+// Aggiungi una pagina delle opzioni nel backend del plugin
+function wccf_add_plugin_options_page() {
+    add_menu_page( 
+        'WooCommerce Checkout Fee', 
+        'WooCommerce Checkout Fee', 
         'manage_options', 
-        'wc_checkout_fee', 
-        'wc_checkout_fee_settings_page_content'
+        'wccf-settings', 
+        'wccf_plugin_options_page',
+        'dashicons-cart'
     );
 }
-add_action( 'admin_menu', 'wc_checkout_fee_settings_page' );
+add_action( 'admin_menu', 'wccf_add_plugin_options_page' );
 
-// Contenuto della pagina delle impostazioni
-function wc_checkout_fee_settings_page_content() {
+// Contenuto della pagina delle opzioni
+function wccf_plugin_options_page() {
     ?>
     <div class="wrap">
-        <h2><?php _e( 'WooCommerce Checkout Fee Settings', 'woocommerce-checkout-fee' ); ?></h2>
+        <h1>Impostazioni Fee WooCommerce Checkout</h1>
         <form method="post" action="options.php">
             <?php
-            settings_fields( 'wc_checkout_fee_settings' );
-            do_settings_sections( 'wc_checkout_fee' );
+            settings_fields( 'wccf_options_group' );
+            do_settings_sections( 'wccf-settings' );
             ?>
             <table class="form-table">
                 <tr valign="top">
-                    <th scope="row"><?php _e( 'Fee Amount', 'woocommerce-checkout-fee' ); ?></th>
-                    <td>
-                        <input type="number" name="wc_checkout_fee_amount" value="<?php echo esc_attr( get_option( 'wc_checkout_fee_amount', 10 ) ); ?>" min="0" step="0.01" />
-                    </td>
+                    <th scope="row">Testo della Fee</th>
+                    <td><input type="text" name="wccf_fee_text" value="<?php echo esc_attr( get_option('wccf_fee_text') ); ?>" /></td>
                 </tr>
+
                 <tr valign="top">
-                    <th scope="row"><?php _e( 'Fee Label', 'woocommerce-checkout-fee' ); ?></th>
-                    <td>
-                        <input type="text" name="wc_checkout_fee_label" value="<?php echo esc_attr( get_option( 'wc_checkout_fee_label', 'Checkout Fee' ) ); ?>" />
-                    </td>
+                    <th scope="row">Importo della Fee (€)</th>
+                    <td><input type="number" name="wccf_fee_amount" value="<?php echo esc_attr( get_option('wccf_fee_amount') ); ?>" /></td>
                 </tr>
             </table>
+
             <?php submit_button(); ?>
         </form>
     </div>
     <?php
 }
 
-// Registra le opzioni nelle impostazioni
-function wc_checkout_fee_register_settings() {
-    register_setting( 'wc_checkout_fee_settings', 'wc_checkout_fee_amount' );
-    register_setting( 'wc_checkout_fee_settings', 'wc_checkout_fee_label' );
+// Registra le opzioni nel database
+function wccf_register_settings() {
+    register_setting( 'wccf_options_group', 'wccf_fee_text' );
+    register_setting( 'wccf_options_group', 'wccf_fee_amount' );
 }
-add_action( 'admin_init', 'wc_checkout_fee_register_settings' );
+add_action( 'admin_init', 'wccf_register_settings' );
+
+// Funzione per applicare il testo e l'importo personalizzati della fee
+function wccf_custom_fee_text( $cart ) {
+    $fee_text = get_option( 'wccf_fee_text', 'Fee personalizzata' );
+    $fee_amount = get_option( 'wccf_fee_amount', 10 );
+    
+    if ( isset( $_POST['wccf_checkout_fee'] ) && $_POST['wccf_checkout_fee'] == '1' ) {
+        $cart->add_fee( $fee_text, $fee_amount );
+    }
+}
+add_action( 'woocommerce_cart_calculate_fees', 'wccf_custom_fee_text' );
+?>
